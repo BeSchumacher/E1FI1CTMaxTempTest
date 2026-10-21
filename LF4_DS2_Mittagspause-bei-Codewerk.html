@@ -1,0 +1,889 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mittagspause bei Codewerk</title>
+<style>
+  :root {
+    color-scheme: light;
+    --ink: #1f2937;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --paper: #ffffff;
+    --bg: #f3f4f6;
+    --brand: #1e3a5f;
+    --brand-2: #2563eb;
+    --good: #15803d;
+    --good-bg: #dcfce7;
+    --bad: #b91c1c;
+    --bad-bg: #fee2e2;
+    --warn: #92400e;
+    --warn-bg: #fef3c7;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    font-size: 16px; line-height: 1.5;
+  }
+  .app { max-width: 1100px; margin: 0 auto; padding: 12px 16px 24px; }
+
+  header.top {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+    background: var(--brand); color: #fff; border-radius: 12px 12px 0 0; padding: 10px 16px;
+  }
+  header.top h1 { font-size: 18px; margin: 0; flex: 1 1 auto; letter-spacing: .2px; }
+  .stats { display: flex; gap: 6px; flex-wrap: wrap; }
+  .stat { background: rgba(255,255,255,.12); border-radius: 999px; padding: 3px 12px; font-size: 14px; white-space: nowrap; }
+  .stat b { font-variant-numeric: tabular-nums; }
+  .btn-end { background: transparent; color: #fff; border: 1px solid rgba(255,255,255,.5); border-radius: 8px; padding: 5px 12px; font: inherit; font-size: 14px; cursor: pointer; }
+  .btn-end:hover { background: rgba(255,255,255,.12); }
+
+  nav.rooms { display: flex; background: var(--paper); border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
+  nav.rooms button {
+    flex: 1; font: inherit; font-size: 15px; padding: 10px 8px; border: 0; background: transparent; color: var(--muted);
+    border-bottom: 3px solid transparent; cursor: pointer;
+  }
+  nav.rooms button[aria-selected="true"] { color: var(--ink); font-weight: 600; border-bottom-color: var(--brand-2); }
+  nav.rooms button:hover { color: var(--ink); }
+
+  .stage { position: relative; background: #000; border-radius: 0 0 12px 12px; overflow: hidden; border: 1px solid var(--line); border-top: 0; }
+  .scene { display: block; width: 100%; height: auto; cursor: zoom-in; user-select: none; }
+  .scene[hidden] { display: none; }
+  .scene text { pointer-events: none; }
+  .hs { cursor: zoom-in; outline: none; }
+  .hs:focus-visible .hit { stroke: #f59e0b; stroke-width: 4; stroke-dasharray: 8 5; }
+  .hit { fill: transparent; }
+  .badge { pointer-events: none; }
+  .hint { color: var(--muted); font-size: 14px; margin: 8px 2px 0; }
+
+  .toast {
+    position: absolute; transform: translate(-50%, -130%); background: rgba(17,24,39,.85); color: #fff;
+    font-size: 13px; padding: 4px 10px; border-radius: 6px; pointer-events: none; white-space: nowrap;
+    animation: fade 1.2s ease forwards;
+  }
+  @keyframes fade { 0% { opacity: 0; } 15% { opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; } }
+
+  .modal { position: fixed; inset: 0; background: rgba(17,24,39,.55); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 20; }
+  .modal[hidden] { display: none; }
+  .dialog { background: var(--paper); border-radius: 14px; max-width: 580px; width: 100%; max-height: calc(100vh - 32px); overflow: auto; padding: 22px 24px; box-shadow: 0 20px 50px rgba(0,0,0,.3); }
+  .kicker { font-size: 13px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); margin: 0 0 2px; }
+  .dialog h2 { margin: 0 0 10px; font-size: 21px; line-height: 1.25; }
+  .look { background: var(--bg); border-left: 4px solid var(--brand-2); padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 0 0 14px; }
+  .q { font-weight: 600; margin: 14px 0 10px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .btn { font: inherit; border-radius: 9px; padding: 9px 16px; border: 1px solid #d1d5db; background: #fff; color: var(--ink); cursor: pointer; }
+  .btn:hover { background: #f9fafb; }
+  .btn.primary { background: var(--brand-2); border-color: var(--brand-2); color: #fff; }
+  .btn.primary:hover { background: #1d4ed8; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn:focus-visible, .goal:focus-visible, nav.rooms button:focus-visible, .btn-end:focus-visible, .linkbtn:focus-visible { outline: 3px solid #f59e0b; outline-offset: 2px; }
+  .linkbtn { background: none; border: 0; color: var(--muted); font: inherit; font-size: 14px; text-decoration: underline; cursor: pointer; padding: 6px 0 0; }
+
+  .goals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .goal { font: inherit; border: 2px solid #d1d5db; background: #fff; border-radius: 10px; padding: 10px 6px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--ink); }
+  .goal b { font-size: 22px; line-height: 1; }
+  .goal span { font-size: 13px; }
+  .goal[aria-pressed="true"] { border-color: var(--brand-2); background: #eff6ff; color: #1e40af; }
+
+  .verdict { border-radius: 10px; padding: 10px 14px; font-weight: 700; margin: 0 0 12px; display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+  .verdict.good { background: var(--good-bg); color: var(--good); }
+  .verdict.bad { background: var(--bad-bg); color: var(--bad); }
+  .verdict small { font-weight: 600; white-space: nowrap; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+  .chip { font-size: 13px; border-radius: 999px; padding: 3px 10px; }
+  .chip.ok { background: var(--good-bg); color: var(--good); }
+  .chip.wrong { background: var(--bad-bg); color: var(--bad); }
+  .chip.miss { background: var(--warn-bg); color: var(--warn); }
+  .chip.neutral { background: #e0e7ff; color: #3730a3; }
+  .measure { background: #f0f9ff; border-radius: 8px; padding: 8px 12px; margin: 10px 0 0; font-size: 15px; }
+
+  .overlay { position: fixed; inset: 0; background: rgba(15,23,42,.7); z-index: 30; display: flex; align-items: center; justify-content: center; padding: 16px; overflow: auto; }
+  .overlay[hidden] { display: none; }
+  .card { background: var(--paper); border-radius: 16px; max-width: 640px; width: 100%; padding: 26px 28px; box-shadow: 0 20px 60px rgba(0,0,0,.35); margin: auto; }
+  .card.wide { max-width: 980px; }
+  .card h2 { margin: 0 0 6px; font-size: 26px; }
+  .card .time { color: var(--muted); margin: 0 0 14px; }
+  .card ul { padding-left: 20px; }
+  .summary { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0; }
+  .sumbox { flex: 1 1 140px; background: var(--bg); border-radius: 10px; padding: 10px 14px; }
+  .sumbox b { display: block; font-size: 24px; font-variant-numeric: tabular-nums; }
+  .sumbox span { font-size: 13px; color: var(--muted); }
+  .rating { font-size: 18px; font-weight: 600; margin: 4px 0 12px; }
+  .tablewrap { overflow-x: auto; }
+  table.result { width: 100%; border-collapse: collapse; font-size: 14px; }
+  table.result th, table.result td { text-align: left; vertical-align: top; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+  table.result th { background: var(--bg); font-weight: 600; }
+  .st-good { color: var(--good); font-weight: 600; }
+  .st-bad { color: var(--bad); font-weight: 600; }
+  .st-none { color: var(--muted); font-weight: 600; }
+  footer.foot { color: #9ca3af; font-size: 12px; text-align: right; margin-top: 10px; }
+
+  @media (max-width: 640px) {
+    header.top h1 { font-size: 16px; }
+    .dialog { padding: 18px; }
+    .goal span { font-size: 11px; }
+    .card { padding: 20px; }
+  }
+  @media print {
+    body { background: #fff; }
+    .app, .modal { display: none !important; }
+    .overlay { position: static; background: none; padding: 0; display: block !important; }
+    .overlay#intro { display: none !important; }
+    .card { box-shadow: none; max-width: none; padding: 0; }
+    .noprint { display: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <h1>Mittagspause bei Codewerk</h1>
+    <div class="stats" aria-live="polite">
+      <span class="stat">Probleme <b id="st-found">0</b>/8</span>
+      <span class="stat">Punkte <b id="st-score">0</b></span>
+      <span class="stat">&#9201; <b id="st-time">00:00</b></span>
+    </div>
+    <button class="btn-end" id="btn-end" type="button">Rundgang beenden</button>
+  </header>
+
+  <nav class="rooms" role="tablist" aria-label="Räume">
+    <button role="tab" data-room="buero" aria-selected="true">Großraumbüro</button>
+    <button role="tab" data-room="server" aria-selected="false">Serverraum</button>
+    <button role="tab" data-room="konferenz" aria-selected="false">Konferenzraum</button>
+  </nav>
+
+  <div class="stage" id="stage">
+    <svg class="scene" id="room-buero" viewBox="0 0 1000 600" xmlns="http://www.w3.org/2000/svg" aria-label="Großraumbüro">
+      <defs>
+        <linearGradient id="lockgrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#2f4d78"/><stop offset="1" stop-color="#5e81ac"/>
+        </linearGradient>
+      </defs>
+      <!-- Wand, Boden -->
+      <rect width="1000" height="400" fill="#ede6da"/>
+      <rect y="400" width="1000" height="200" fill="#c9a87c"/>
+      <rect y="392" width="1000" height="10" fill="#d6ccbb"/>
+      <g stroke="#b48f63" stroke-width="2">
+        <line x1="0" y1="450" x2="1000" y2="450"/><line x1="0" y1="510" x2="1000" y2="510"/><line x1="0" y1="570" x2="1000" y2="570"/>
+        <line x1="120" y1="402" x2="120" y2="450"/><line x1="560" y1="402" x2="560" y2="450"/><line x1="860" y1="402" x2="860" y2="450"/>
+        <line x1="260" y1="450" x2="260" y2="510"/><line x1="660" y1="450" x2="660" y2="510"/>
+        <line x1="80" y1="510" x2="80" y2="570"/><line x1="480" y1="510" x2="480" y2="570"/><line x1="900" y1="510" x2="900" y2="570"/>
+      </g>
+      <!-- Deckenlampen -->
+      <g><rect x="345" y="0" width="4" height="22" fill="#b9b0a0"/><path d="M317 22h60l-10 14h-40z" fill="#f8f4ec" stroke="#cfc6b6"/>
+         <rect x="690" y="0" width="4" height="22" fill="#b9b0a0"/><path d="M662 22h60l-10 14h-40z" fill="#f8f4ec" stroke="#cfc6b6"/></g>
+      <!-- Fenster -->
+      <rect x="40" y="60" width="180" height="230" fill="#ffffff" stroke="#cdc5b6" stroke-width="3"/>
+      <rect x="50" y="70" width="160" height="210" fill="#cfe8f6"/>
+      <g fill="#a9cde3"><rect x="58" y="200" width="30" height="80"/><rect x="92" y="168" width="26" height="112"/><rect x="138" y="215" width="22" height="65"/><rect x="164" y="186" width="40" height="94"/></g>
+      <rect x="127" y="70" width="6" height="210" fill="#ffffff"/><rect x="50" y="172" width="160" height="6" fill="#ffffff"/>
+      <rect x="32" y="288" width="196" height="10" fill="#f7f3ec" stroke="#cdc5b6"/>
+      <!-- Poster -->
+      <rect x="466" y="50" width="204" height="100" rx="4" fill="#1e3a5f"/>
+      <path transform="translate(484 66) scale(0.95)" d="M8 6 C16 -2 26 0 30 6 C34 0 44 -2 52 6 C60 14 58 30 52 40 L48 62 C47 68 40 68 39 62 L35 46 C34 42 26 42 25 46 L21 62 C20 68 13 68 12 62 L8 40 C2 30 0 14 8 6 Z" fill="#ffffff"/>
+      <text x="548" y="92" fill="#ffffff" font-size="18" font-weight="700">DentaCloud</text>
+      <text x="548" y="114" fill="#9cc3e8" font-size="12">350 Praxen</text>
+      <text x="548" y="130" fill="#9cc3e8" font-size="12">vertrauen uns.</text>
+
+      <!-- Uhr (Flavor) -->
+      <g class="hs" data-id="uhr" tabindex="0" role="button" aria-label="Wanduhr">
+        <circle class="hit" cx="885" cy="85" r="38"/>
+        <circle cx="885" cy="85" r="30" fill="#ffffff" stroke="#4b5563" stroke-width="4"/>
+        <g stroke="#4b5563" stroke-width="2"><line x1="885" y1="59" x2="885" y2="64"/><line x1="911" y1="85" x2="906" y2="85"/><line x1="885" y1="111" x2="885" y2="106"/><line x1="859" y1="85" x2="864" y2="85"/></g>
+        <line x1="885" y1="85" x2="889" y2="70" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
+        <line x1="885" y1="85" x2="885" y2="107" stroke="#1f2937" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="885" cy="85" r="3" fill="#dc2626"/>
+      </g>
+
+      <!-- Pflanze (Flavor) -->
+      <g class="hs" data-id="pflanze" tabindex="0" role="button" aria-label="Zimmerpflanze">
+        <rect class="hit" x="220" y="262" width="76" height="140"/>
+        <ellipse cx="245" cy="312" rx="10" ry="27" transform="rotate(-32 245 312)" fill="#7c9a4e"/>
+        <ellipse cx="273" cy="310" rx="10" ry="28" transform="rotate(30 273 310)" fill="#8ea556"/>
+        <ellipse cx="258" cy="298" rx="9" ry="31" fill="#6f8c45"/>
+        <ellipse cx="236" cy="333" rx="7" ry="18" transform="rotate(-72 236 333)" fill="#b39b57"/>
+        <ellipse cx="282" cy="334" rx="6" ry="16" transform="rotate(74 282 334)" fill="#a8914e"/>
+        <path d="M232 342h52l-8 56h-36z" fill="#b45f3c"/>
+        <rect x="228" y="336" width="60" height="10" rx="2" fill="#c96f48"/>
+      </g>
+
+      <!-- Schreibtische -->
+      <g fill="#7a5a3c">
+        <rect x="300" y="344" width="10" height="60"/><rect x="490" y="344" width="10" height="60"/>
+        <rect x="540" y="344" width="10" height="60"/><rect x="730" y="344" width="10" height="60"/>
+        <rect x="780" y="344" width="10" height="60"/><rect x="970" y="344" width="10" height="60"/>
+      </g>
+      <rect x="290" y="330" width="220" height="14" rx="2" fill="#a07a55"/>
+      <rect x="530" y="330" width="220" height="14" rx="2" fill="#a07a55"/>
+      <rect x="770" y="330" width="220" height="14" rx="2" fill="#a07a55"/>
+
+      <!-- Kevins Platz -->
+      <rect x="388" y="292" width="24" height="38" fill="#4b5563"/>
+      <rect x="368" y="325" width="64" height="6" rx="3" fill="#4b5563"/>
+      <rect x="330" y="170" width="140" height="124" rx="6" fill="#2b2f36"/>
+      <g class="hs" data-id="sperre" tabindex="0" role="button" aria-label="Kevins Bildschirm">
+        <rect class="hit" x="336" y="176" width="128" height="108"/>
+        <rect x="338" y="178" width="124" height="104" fill="url(#lockgrad)"/>
+        <text x="400" y="203" fill="#ffffff" font-size="15" text-anchor="middle" font-weight="600">12:31</text>
+        <rect x="391" y="216" width="18" height="14" rx="2" fill="#ffffff"/>
+        <path d="M394 216v-5a6 6 0 0 1 12 0v5" stroke="#ffffff" stroke-width="2.5" fill="none"/>
+        <text x="400" y="248" fill="#ffffff" font-size="10" text-anchor="middle">Gesperrt</text>
+        <text x="400" y="262" fill="#dce6f2" font-size="9" text-anchor="middle">Kevin Maier</text>
+      </g>
+      <g class="hs" data-id="postit" tabindex="0" role="button" aria-label="Gelber Zettel am Monitor">
+        <rect class="hit" x="438" y="148" width="60" height="58"/>
+        <g transform="rotate(7 468 177)">
+          <rect x="448" y="158" width="42" height="38" fill="#ffe45c"/>
+          <rect x="448" y="158" width="42" height="6" fill="#f5d63d"/>
+          <text x="451" y="175" font-size="8" fill="#333">Git:</text>
+          <text x="451" y="187" font-size="7" fill="#333">Kevin2024!</text>
+        </g>
+      </g>
+      <rect x="350" y="318" width="96" height="10" rx="2" fill="#d9dce1"/>
+      <ellipse cx="460" cy="324" rx="6" ry="4" fill="#d9dce1"/>
+      <g class="hs" data-id="pizza" tabindex="0" role="button" aria-label="Rosa Zettel auf dem Schreibtisch">
+        <rect class="hit" x="468" y="302" width="46" height="34"/>
+        <g transform="rotate(-8 490 321)">
+          <rect x="472" y="311" width="38" height="20" fill="#f9a8d4"/>
+          <text x="475" y="324" font-size="7" fill="#7a2350">Fr: Pizza!</text>
+        </g>
+      </g>
+      <g>
+        <rect x="360" y="352" width="80" height="62" rx="12" fill="#374151"/>
+        <rect x="396" y="414" width="8" height="34" fill="#4b5563"/>
+        <path d="M364 452h72" stroke="#4b5563" stroke-width="6" stroke-linecap="round"/>
+        <circle cx="366" cy="456" r="5" fill="#1f2937"/><circle cx="400" cy="456" r="5" fill="#1f2937"/><circle cx="434" cy="456" r="5" fill="#1f2937"/>
+      </g>
+
+      <!-- Lisas Platz -->
+      <g class="hs" data-id="laptop" tabindex="0" role="button" aria-label="Lisas Laptop">
+        <rect class="hit" x="572" y="214" width="142" height="122"/>
+        <rect x="585" y="222" width="116" height="94" rx="5" fill="#2b2f36"/>
+        <rect x="591" y="228" width="104" height="82" fill="#0e1116"/>
+        <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="7.5" fill="#4ade80">
+          <text x="595" y="242">admin@db-prod-01:~#</text>
+          <text x="595" y="256">psql -d dentacloud</text>
+          <text x="595" y="270">dentacloud=# SELECT</text>
+          <text x="595" y="284">* FROM patienten;</text>
+        </g>
+        <rect x="595" y="292" width="6" height="9" fill="#4ade80"/>
+        <path d="M575 316h136l-8 14h-120z" fill="#b8bec6"/>
+      </g>
+      <g class="hs" data-id="kaffee" tabindex="0" role="button" aria-label="Kaffeebecher">
+        <rect class="hit" x="712" y="290" width="40" height="42"/>
+        <rect x="718" y="300" width="20" height="28" rx="3" fill="#ffffff" stroke="#9ca3af"/>
+        <path d="M738 307h4a5 5 0 0 1 0 12h-4" fill="none" stroke="#9ca3af" stroke-width="3"/>
+        <text x="728" y="318" font-size="8" text-anchor="middle" fill="#2563eb">{ }</text>
+      </g>
+      <g transform="rotate(-10 640 420)">
+        <rect x="604" y="366" width="80" height="62" rx="12" fill="#374151"/>
+        <rect x="640" y="428" width="8" height="30" fill="#4b5563"/>
+        <path d="M608 462h72" stroke="#4b5563" stroke-width="6" stroke-linecap="round"/>
+        <circle cx="610" cy="466" r="5" fill="#1f2937"/><circle cx="644" cy="466" r="5" fill="#1f2937"/><circle cx="678" cy="466" r="5" fill="#1f2937"/>
+      </g>
+
+      <!-- Toms Platz -->
+      <rect x="873" y="292" width="24" height="38" fill="#4b5563"/>
+      <rect x="853" y="325" width="64" height="6" rx="3" fill="#4b5563"/>
+      <g class="hs" data-id="forcepush" tabindex="0" role="button" aria-label="Toms Bildschirm">
+        <rect class="hit" x="813" y="168" width="144" height="128"/>
+        <rect x="815" y="170" width="140" height="124" rx="6" fill="#2b2f36"/>
+        <rect x="823" y="178" width="124" height="104" fill="#111827"/>
+        <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="7.5">
+          <text x="827" y="193" fill="#60a5fa">~/dentacloud (main)</text>
+          <text x="827" y="207" fill="#f3f4f6">$ git push --force</text>
+          <text x="827" y="219" fill="#f3f4f6">    origin main</text>
+          <text x="827" y="237" fill="#9ca3af">+ 3f2a1c9...8b7e4d2</text>
+          <text x="827" y="249" fill="#9ca3af">  main -&gt; main</text>
+          <text x="827" y="261" fill="#f87171">  (forced update)</text>
+        </g>
+      </g>
+      <rect x="835" y="318" width="96" height="10" rx="2" fill="#d9dce1"/>
+      <g>
+        <rect x="845" y="352" width="80" height="62" rx="12" fill="#374151"/>
+        <rect x="881" y="414" width="8" height="34" fill="#4b5563"/>
+        <path d="M849 452h72" stroke="#4b5563" stroke-width="6" stroke-linecap="round"/>
+        <circle cx="851" cy="456" r="5" fill="#1f2937"/><circle cx="885" cy="456" r="5" fill="#1f2937"/><circle cx="919" cy="456" r="5" fill="#1f2937"/>
+      </g>
+      <g class="badges"></g>
+    </svg>
+
+    <svg class="scene" id="room-server" viewBox="0 0 1000 600" xmlns="http://www.w3.org/2000/svg" aria-label="Serverraum" hidden>
+      <rect width="1000" height="420" fill="#d9dee5"/>
+      <rect y="420" width="1000" height="180" fill="#b7bec8"/>
+      <g stroke="#a3abb6" stroke-width="2">
+        <line x1="0" y1="480" x2="1000" y2="480"/><line x1="0" y1="540" x2="1000" y2="540"/>
+        <line x1="100" y1="420" x2="100" y2="600"/><line x1="200" y1="420" x2="200" y2="600"/><line x1="300" y1="420" x2="300" y2="600"/>
+        <line x1="400" y1="420" x2="400" y2="600"/><line x1="500" y1="420" x2="500" y2="600"/><line x1="600" y1="420" x2="600" y2="600"/>
+        <line x1="700" y1="420" x2="700" y2="600"/><line x1="800" y1="420" x2="800" y2="600"/><line x1="900" y1="420" x2="900" y2="600"/>
+      </g>
+      <g fill="#a3abb6"><circle cx="530" cy="500" r="2"/><circle cx="550" cy="500" r="2"/><circle cx="570" cy="500" r="2"/><circle cx="530" cy="520" r="2"/><circle cx="550" cy="520" r="2"/><circle cx="570" cy="520" r="2"/></g>
+      <!-- Kabeltrasse -->
+      <rect x="0" y="28" width="1000" height="10" fill="#9ca3af"/>
+      <g fill="none" stroke-width="3">
+        <path d="M480 38 C480 50 482 56 482 60" stroke="#2563eb"/><path d="M500 38 C500 50 502 56 502 60" stroke="#f59e0b"/>
+        <path d="M520 38 C520 50 522 56 522 60" stroke="#16a34a"/><path d="M540 38 C540 50 542 56 542 60" stroke="#dc2626"/>
+      </g>
+
+      <!-- Tür mit Keil -->
+      <g class="hs" data-id="tuer" tabindex="0" role="button" aria-label="Tür zum Serverraum">
+        <rect class="hit" x="55" y="92" width="290" height="360"/>
+        <rect x="60" y="110" width="170" height="312" fill="#6b7280"/>
+        <rect x="70" y="120" width="150" height="302" fill="#f4eee2"/>
+        <path d="M70 360 L220 360 L220 422 L70 422Z" fill="#d9cbb4"/>
+        <rect x="96" y="180" width="60" height="80" fill="#e8dfcf"/>
+        <path d="M220 120 L300 100 L300 446 L220 422 Z" fill="#a3aab5" stroke="#6b7280" stroke-width="2"/>
+        <rect x="284" y="262" width="10" height="4" fill="#374151"/>
+        <g transform="translate(232 168) skewY(-14)">
+          <rect width="56" height="36" fill="#ffffff" stroke="#dc2626" stroke-width="1.5"/>
+          <text x="28" y="12" font-size="7" font-weight="700" text-anchor="middle" fill="#b91c1c">SERVERRAUM</text>
+          <text x="28" y="22" font-size="6" text-anchor="middle" fill="#1f2937">Zutritt nur für</text>
+          <text x="28" y="30" font-size="6" text-anchor="middle" fill="#1f2937">Berechtigte</text>
+        </g>
+        <path d="M300 446 L342 446 L300 430 Z" fill="#92400e"/>
+      </g>
+
+      <!-- Feuerlöscher -->
+      <g class="hs" data-id="loescher" tabindex="0" role="button" aria-label="Feuerlöscher">
+        <rect class="hit" x="338" y="246" width="60" height="126"/>
+        <rect x="352" y="262" width="26" height="6" fill="#4b5563"/>
+        <rect x="350" y="270" width="30" height="88" rx="10" fill="#dc2626"/>
+        <rect x="358" y="254" width="14" height="18" fill="#1f2937"/>
+        <path d="M372 260 C394 268 392 320 382 342" stroke="#1f2937" stroke-width="4" fill="none"/>
+        <rect x="355" y="294" width="20" height="26" fill="#ffffff"/>
+        <text x="365" y="311" font-size="8" text-anchor="middle" fill="#1f2937" font-weight="700">CO₂</text>
+      </g>
+
+      <!-- Rack -->
+      <rect x="430" y="60" width="180" height="410" rx="4" fill="#1f2937"/>
+      <rect x="440" y="68" width="160" height="16" fill="#111827"/>
+      <text x="520" y="80" fill="#e5e7eb" font-size="10" text-anchor="middle" font-family="ui-monospace, Menlo, Consolas, monospace">PROD-RACK 01</text>
+      <g id="rack-units"></g>
+      <g class="hs" data-id="nas" tabindex="0" role="button" aria-label="Gerät unten im Rack">
+        <rect class="hit" x="436" y="384" width="168" height="70"/>
+        <rect x="442" y="390" width="156" height="58" rx="2" fill="#e5e7eb"/>
+        <g fill="#cbd5e1"><rect x="450" y="398" width="18" height="42"/><rect x="474" y="398" width="18" height="42"/><rect x="498" y="398" width="18" height="42"/></g>
+        <g fill="#3b82f6"><circle cx="459" cy="434" r="2.5"/><circle cx="483" cy="434" r="2.5"/><circle cx="507" cy="434" r="2.5"/></g>
+        <text x="590" y="414" text-anchor="end" font-size="9" font-weight="700" fill="#1f2937">BACKUP-</text>
+        <text x="590" y="426" text-anchor="end" font-size="9" font-weight="700" fill="#1f2937">NAS</text>
+      </g>
+      <rect x="436" y="470" width="14" height="8" fill="#111827"/><rect x="590" y="470" width="14" height="8" fill="#111827"/>
+
+      <!-- Kartons -->
+      <g class="hs" data-id="kartons" tabindex="0" role="button" aria-label="Kartons neben dem Rack">
+        <rect class="hit" x="628" y="300" width="176" height="176"/>
+        <g stroke="#a47a4b" stroke-width="2">
+          <rect x="638" y="400" width="78" height="72" fill="#c69c6d"/>
+          <rect x="718" y="400" width="78" height="72" fill="#c69c6d"/>
+          <rect x="676" y="328" width="80" height="72" fill="#cfa575"/>
+        </g>
+        <g fill="#e6c99a"><rect x="672" y="400" width="10" height="72"/><rect x="752" y="400" width="10" height="72"/><rect x="711" y="328" width="10" height="72"/></g>
+        <g font-size="7" fill="#3f2a14" text-anchor="middle">
+          <rect x="644" y="430" width="24" height="18" fill="#ffffff"/><text x="656" y="438">Papier</text><text x="656" y="445">A4</text>
+          <rect x="724" y="430" width="24" height="18" fill="#ffffff"/><text x="736" y="438">Papier</text><text x="736" y="445">A4</text>
+        </g>
+        <rect x="726" y="352" width="26" height="22" fill="#ffffff"/>
+        <text x="739" y="361" font-size="6.5" text-anchor="middle" fill="#3f2a14">Drucker-</text>
+        <text x="739" y="369" font-size="6.5" text-anchor="middle" fill="#3f2a14">papier</text>
+      </g>
+
+      <!-- Rauchmelder (Flavor) -->
+      <g class="hs" data-id="rauchmelder" tabindex="0" role="button" aria-label="Rauchmelder">
+        <circle class="hit" cx="820" cy="76" r="28"/>
+        <circle cx="820" cy="76" r="17" fill="#f9fafb" stroke="#9ca3af" stroke-width="2"/>
+        <circle cx="820" cy="76" r="7" fill="#e5e7eb"/>
+        <circle cx="831" cy="67" r="2.6" fill="#22c55e"/>
+      </g>
+
+      <!-- Netzwerkschrank (Deko) -->
+      <rect x="860" y="200" width="104" height="270" rx="4" fill="#4b5563"/>
+      <rect x="870" y="214" width="84" height="36" fill="#374151"/>
+      <g fill="#9ca3af"><rect x="876" y="222" width="6" height="6"/><rect x="886" y="222" width="6" height="6"/><rect x="896" y="222" width="6" height="6"/><rect x="906" y="222" width="6" height="6"/><rect x="916" y="222" width="6" height="6"/><rect x="926" y="222" width="6" height="6"/><rect x="936" y="222" width="6" height="6"/></g>
+      <g stroke-width="2" fill="none"><path d="M879 230 C879 250 870 260 870 270" stroke="#2563eb"/><path d="M899 230 C899 250 892 262 890 272" stroke="#f59e0b"/><path d="M919 230 C919 250 912 262 910 272" stroke="#16a34a"/></g>
+      <rect x="870" y="290" width="84" height="160" fill="#374151"/>
+      <rect x="862" y="470" width="12" height="8" fill="#374151"/><rect x="950" y="470" width="12" height="8" fill="#374151"/>
+      <g class="badges"></g>
+    </svg>
+
+    <svg class="scene" id="room-konferenz" viewBox="0 0 1000 600" xmlns="http://www.w3.org/2000/svg" aria-label="Konferenzraum" hidden>
+      <rect width="1000" height="410" fill="#e4eaf0"/>
+      <rect y="410" width="1000" height="190" fill="#6b7a8c"/>
+      <rect y="410" width="1000" height="8" fill="#5c6a7b"/>
+      <!-- Bild (Deko) -->
+      <rect x="560" y="90" width="140" height="92" fill="#ffffff" stroke="#cbd5e1" stroke-width="4"/>
+      <circle cx="600" cy="128" r="18" fill="#93c5fd"/><rect x="618" y="118" width="62" height="40" fill="#fcd34d"/><path d="M570 172 L630 140 L690 172Z" fill="#86efac"/>
+
+      <!-- Beamer (Flavor) -->
+      <g class="hs" data-id="beamer" tabindex="0" role="button" aria-label="Beamer">
+        <rect class="hit" x="704" y="0" width="82" height="62"/>
+        <rect x="742" y="0" width="6" height="30" fill="#9ca3af"/>
+        <rect x="715" y="30" width="60" height="22" rx="4" fill="#e5e7eb" stroke="#9ca3af"/>
+        <circle cx="730" cy="41" r="7" fill="#374151"/><circle cx="730" cy="41" r="3" fill="#6b7280"/>
+      </g>
+
+      <!-- Whiteboard -->
+      <g class="hs" data-id="whiteboard" tabindex="0" role="button" aria-label="Whiteboard">
+        <rect class="hit" x="62" y="52" width="396" height="262"/>
+        <rect x="70" y="60" width="380" height="240" rx="4" fill="#f9fafb" stroke="#9ca3af" stroke-width="5"/>
+        <rect x="80" y="300" width="360" height="8" fill="#9ca3af"/>
+        <rect x="110" y="294" width="24" height="6" rx="2" fill="#2563eb"/><rect x="140" y="294" width="24" height="6" rx="2" fill="#dc2626"/><rect x="380" y="292" width="34" height="8" rx="2" fill="#4b5563"/>
+        <g font-family="'Segoe Print', 'Bradley Hand', 'Comic Sans MS', cursive">
+          <text x="95" y="100" font-size="20" fill="#1f2937">Sprint 42 – Ziele</text>
+          <text x="100" y="130" font-size="15" fill="#2563eb">• Terminbuchung v2</text>
+          <text x="100" y="154" font-size="15" fill="#2563eb">• Export für Praxen</text>
+          <text x="100" y="178" font-size="15" fill="#2563eb">• Bugfix Abrechnung</text>
+          <text x="95" y="220" font-size="14" fill="#dc2626">WLAN Büro: Codewerk-Office</text>
+          <text x="95" y="240" font-size="14" fill="#dc2626">PW: Zahn$ee2026</text>
+          <text x="95" y="276" font-size="14" fill="#111827">Build-Server: admin / admin</text>
+        </g>
+        <g transform="translate(372 108) scale(0.85)" fill="none" stroke="#2563eb" stroke-width="2.5">
+          <path d="M8 6 C16 -2 26 0 30 6 C34 0 44 -2 52 6 C60 14 58 30 52 40 L48 62 C47 68 40 68 39 62 L35 46 C34 42 26 42 25 46 L21 62 C20 68 13 68 12 62 L8 40 C2 30 0 14 8 6 Z"/>
+          <circle cx="22" cy="20" r="2" fill="#2563eb"/><circle cx="38" cy="20" r="2" fill="#2563eb"/>
+          <path d="M20 29 Q30 37 40 29"/>
+        </g>
+      </g>
+
+      <!-- Stühle hinter dem Tisch -->
+      <g fill="#374151">
+        <rect x="320" y="320" width="70" height="92" rx="10"/><rect x="440" y="320" width="70" height="92" rx="10"/>
+        <rect x="580" y="320" width="70" height="92" rx="10"/><rect x="700" y="320" width="70" height="92" rx="10"/>
+      </g>
+      <!-- Tisch -->
+      <rect x="280" y="400" width="530" height="16" rx="2" fill="#5b4636"/>
+      <rect x="298" y="416" width="12" height="96" fill="#4a3829"/><rect x="780" y="416" width="12" height="96" fill="#4a3829"/>
+      <rect x="456" y="393" width="62" height="7" rx="2" fill="#9ca3af"/>
+
+      <!-- Karaffe (Flavor) -->
+      <g class="hs" data-id="karaffe" tabindex="0" role="button" aria-label="Wasserkaraffe">
+        <rect class="hit" x="352" y="336" width="88" height="66"/>
+        <path d="M372 400 L366 368 Q366 356 376 352 L376 344 L388 344 L388 352 Q398 356 398 368 L392 400 Z" fill="#bfe3f5" stroke="#7fb6d5" stroke-width="2"/>
+        <path d="M368 376 L396 376 L392 400 L372 400 Z" fill="#93c5fd" opacity=".6"/>
+        <rect x="406" y="378" width="12" height="22" fill="#dbeafe" stroke="#93c5fd"/>
+        <rect x="422" y="378" width="12" height="22" fill="#dbeafe" stroke="#93c5fd"/>
+      </g>
+
+      <!-- USB-Stick -->
+      <g class="hs" data-id="usb" tabindex="0" role="button" aria-label="USB-Stick auf dem Tisch">
+        <rect class="hit" x="532" y="360" width="114" height="42"/>
+        <g transform="rotate(-10 572 378)">
+          <rect x="538" y="368" width="68" height="14" rx="2" fill="#fef3c7" stroke="#d97706"/>
+          <text x="541" y="378" font-size="6.5" fill="#78350f">Export Patienten Q3</text>
+        </g>
+        <circle cx="556" cy="393" r="6" fill="none" stroke="#9ca3af" stroke-width="2"/>
+        <rect x="562" y="388" width="34" height="11" rx="3" fill="#2563eb"/>
+        <rect x="596" y="390" width="12" height="7" fill="#cbd5e1"/>
+      </g>
+
+      <!-- Beistelltisch mit Gast-PC -->
+      <rect x="830" y="330" width="150" height="12" fill="#d1d5db"/>
+      <rect x="842" y="342" width="8" height="160" fill="#9ca3af"/><rect x="960" y="342" width="8" height="160" fill="#9ca3af"/>
+      <g class="hs" data-id="gastpc" tabindex="0" role="button" aria-label="Rechner auf dem Beistelltisch">
+        <rect class="hit" x="842" y="214" width="126" height="118"/>
+        <rect x="896" y="312" width="16" height="18" fill="#4b5563"/>
+        <rect x="882" y="326" width="44" height="5" rx="2" fill="#4b5563"/>
+        <rect x="848" y="220" width="114" height="94" rx="5" fill="#2b2f36"/>
+        <rect x="854" y="226" width="102" height="72" fill="#f8fafc"/>
+        <rect x="854" y="226" width="102" height="13" fill="#1e3a5f"/>
+        <text x="858" y="236" font-size="7.5" fill="#ffffff" font-weight="700">DentaCloud</text>
+        <g fill="#cbd5e1"><rect x="860" y="246" width="70" height="5"/><rect x="860" y="256" width="88" height="4"/><rect x="860" y="264" width="80" height="4"/></g>
+        <rect x="860" y="276" width="36" height="12" rx="3" fill="#2563eb"/>
+        <rect x="870" y="300" width="70" height="11" rx="2" fill="#16a34a"/>
+        <text x="905" y="308" font-size="6.5" text-anchor="middle" fill="#ffffff" font-weight="700">GAST-PC · Gastnetz</text>
+      </g>
+      <g class="badges"></g>
+    </svg>
+  </div>
+  <p class="hint">Klicken Sie auf alles, was Sie genauer ansehen möchten. Wechseln Sie die Räume über die Reiter über dem Bild.</p>
+  <footer class="foot">Fiktives Unterrichtsszenario · LF 4 Schutzbedarfsanalyse · Codewerk GmbH und DentaCloud sind erfunden.</footer>
+</div>
+
+<div class="modal" id="modal" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-title" id="dlg"></div>
+</div>
+
+<div class="overlay" id="intro">
+  <div class="card">
+    <p class="kicker">LF 4 · Doppelstunde 2</p>
+    <h2>Mittagspause bei Codewerk</h2>
+    <p>Es ist 12:30 Uhr. Das Team DentaCloud ist beim Essen. Nach dem Vorfall vom Montag hat Teamleiterin Sandra Kühn Sie gebeten, einmal in Ruhe durch Großraumbüro, Serverraum und Konferenzraum zu gehen.</p>
+    <p><b>Ihr Auftrag:</b> Finden Sie die <b>8 Sicherheitsprobleme</b> und bestimmen Sie jeweils, welche Schutzziele gefährdet sind.</p>
+    <ul>
+      <li><b>Achtung:</b> Nicht alles, was verdächtig aussieht, ist ein Problem. Für Fehlalarme gibt es Punktabzug.</li>
+      <li>Jedes Objekt können Sie nur einmal bewerten. Überlegen Sie gemeinsam, bevor Sie klicken.</li>
+      <li>Sie haben etwa 15 Minuten.</li>
+    </ul>
+    <div class="actions"><button class="btn primary" id="btn-start" type="button">Rundgang starten</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="end" hidden>
+  <div class="card wide" id="end-card"></div>
+</div>
+
+<script>
+(function () {
+  var GOALS = { V: 'Vertraulichkeit', I: 'Integrität', A: 'Verfügbarkeit' };
+  var ROOMS = { buero: 'Großraumbüro', server: 'Serverraum', konferenz: 'Konferenzraum' };
+
+  var ITEMS = {
+    postit: { room: 'buero', type: 'problem', title: 'Gelber Zettel am Monitor', badge: [492, 152], goals: ['V', 'I'],
+      look: 'Am Rand von Kevins Monitor klebt ein gelber Zettel: „Git: Kevin2024!“',
+      explain: 'Jeder, der am Platz vorbeikommt, kennt jetzt Kevins Git-Passwort: Kolleginnen und Kollegen, Reinigungskräfte, Besucher. Damit lässt sich der Quellcode lesen (Vertraulichkeit) und verändern (Integrität). Das Passwort ist außerdem leicht zu erraten: Vorname plus Jahreszahl.',
+      measure: 'Passwortmanager nutzen, Mehrfaktor-Anmeldung für Git einschalten, das Passwort sofort ändern.' },
+    laptop: { room: 'buero', type: 'problem', title: 'Lisas Laptop', badge: [706, 218], goals: ['V', 'I', 'A'],
+      look: 'Lisas Laptop ist aufgeklappt und nicht gesperrt. Im Terminal läuft eine Sitzung als admin auf dem Produktivserver db-prod-01. Eine Abfrage auf die Tabelle „patienten“ ist schon getippt.',
+      explain: 'Wer jetzt an den Laptop geht, arbeitet mit Admin-Rechten auf der Produktivdatenbank. Er kann Patientendaten lesen (Vertraulichkeit), ändern (Integrität) oder die Datenbank löschen und herunterfahren (Verfügbarkeit).',
+      measure: 'Bildschirm beim Verlassen sperren (Windows + L), automatische Sperre nach kurzer Zeit, keine offenen Admin-Sitzungen auf Produktivsystemen.' },
+    forcepush: { room: 'buero', type: 'problem', title: 'Toms Bildschirm', badge: [952, 172], goals: ['I'],
+      look: 'Auf Toms Monitor steht im Terminal: „git push --force origin main“ und darunter „(forced update)“.',
+      explain: 'Ein Force-Push überschreibt die Historie des Hauptzweigs. Commits der Kolleginnen und Kollegen können verloren gehen, und ungeprüfter Code landet direkt in dem Zweig, aus dem die Pipeline die Software für 350 Praxen baut. Ob der Code noch stimmt, kann niemand mehr nachvollziehen (Integrität).',
+      measure: 'Branch-Schutz für main einrichten, Änderungen nur über Pull Requests mit Review zulassen.' },
+    sperre: { room: 'buero', type: 'decoy', title: 'Kevins Bildschirm', badge: [342, 182],
+      look: 'Kevins Bildschirm zeigt den Sperrbildschirm: „Gesperrt – Kevin Maier“.',
+      explain: 'Vorbildlich: Kevin hat seinen Rechner vor der Mittagspause gesperrt. An seinem Platz liegt das Problem woanders …' },
+    pizza: { room: 'buero', type: 'decoy', title: 'Rosa Zettel auf dem Schreibtisch', badge: [512, 304],
+      look: 'Auf Kevins Schreibtisch liegt ein rosa Zettel: „Fr: Pizza!“',
+      explain: 'Nicht jeder Zettel ist ein Sicherheitsproblem. Die Pizza-Bestellung am Freitag ist keine schützenswerte Information.' },
+
+    tuer: { room: 'server', type: 'problem', title: 'Tür zum Serverraum', badge: [308, 98], goals: ['V', 'I', 'A'],
+      look: 'Die Tür zum Serverraum steht offen, ein Holzkeil hält sie fest. Auf dem Schild steht: „Serverraum – Zutritt nur für Berechtigte“.',
+      explain: 'Jeder im Gebäude kommt jetzt an die Server. Er kann Festplatten mitnehmen (Vertraulichkeit), einen präparierten USB-Stick einstecken (Integrität) oder einfach den Stecker ziehen (Verfügbarkeit). Offenbar steht die Tür offen, weil der Raum zu warm wird. Das ist ein zweites Problem.',
+      measure: 'Tür geschlossen halten, Zutrittskontrolle mit Protokoll, Serverraum klimatisieren.' },
+    nas: { room: 'server', type: 'problem', title: 'Gerät unten im Rack', badge: [602, 388], goals: ['A'],
+      look: 'Ganz unten im Produktiv-Rack steckt ein Gerät mit der Aufschrift „BACKUP-NAS“. Darüber laufen die Produktivserver.',
+      explain: 'Die Sicherung steht im selben Schrank wie die Systeme, die sie sichern soll. Brand, Wasserschaden, Diebstahl oder Ransomware treffen Original und Backup gleichzeitig. Dann lässt sich nichts mehr wiederherstellen (Verfügbarkeit).',
+      measure: '3-2-1-Regel: drei Kopien auf zwei verschiedenen Medien, eine davon an einem anderen Ort. Mindestens ein Backup offline oder unveränderbar halten.' },
+    kartons: { room: 'server', type: 'problem', title: 'Kartons neben dem Rack', badge: [798, 324], goals: ['A'],
+      look: 'Neben dem Rack stapeln sich Kartons mit Druckerpapier.',
+      explain: 'Papier ist Brandlast direkt neben den Servern. Ein Brand würde die Systeme zerstören (Verfügbarkeit). Außerdem laufen so ständig Leute in den Serverraum, nur um Papier zu holen.',
+      measure: 'Papier woanders lagern und den Serverraum nur für IT-Technik nutzen.' },
+    loescher: { room: 'server', type: 'decoy', title: 'Feuerlöscher', badge: [394, 250],
+      look: 'Neben der Tür hängt ein CO₂-Feuerlöscher. Prüfplakette: geprüft 03/2026.',
+      explain: 'Gut so: CO₂-Löscher eignen sich für Elektrobrände und hinterlassen keine Rückstände in den Geräten. Genau richtig für einen Serverraum.' },
+
+    whiteboard: { room: 'konferenz', type: 'problem', title: 'Whiteboard', badge: [446, 58], goals: ['V', 'I'],
+      look: 'Neben den Sprint-Zielen steht in Rot: „WLAN Büro: Codewerk-Office, PW: Zahn$ee2026“. Darunter: „Build-Server: admin / admin“.',
+      explain: 'Im Konferenzraum sitzen auch Kunden, Bewerberinnen und Lieferanten. Mit dem WLAN-Passwort sind sie im Firmennetz, mit dem Standard-Login sind sie Admin auf dem Build-Server. Dort liegen Code und Zugangsdaten (Vertraulichkeit), und dort wird die Software für alle Praxen gebaut (Integrität).',
+      measure: 'Zugangsdaten nie offen aufschreiben, Standardpasswörter sofort ändern, Gästen ein eigenes Gastnetz geben.' },
+    usb: { room: 'konferenz', type: 'problem', title: 'USB-Stick auf dem Tisch', badge: [640, 362], goals: ['V'],
+      look: 'Auf dem Tisch liegt ein USB-Stick. Am Anhänger steht: „Export Patienten Q3“.',
+      explain: 'Gesundheitsdaten gehören nach Art. 9 DSGVO zu den besonders geschützten Daten. Unverschlüsselt und unbeaufsichtigt kann jeder sie mitnehmen. Ein Verlust wäre eine meldepflichtige Datenpanne (Vertraulichkeit).',
+      measure: 'Keine Echtdaten auf USB-Sticks exportieren, falls unvermeidbar nur verschlüsselt, Clean-Desk-Regel einführen.' },
+    gastpc: { room: 'konferenz', type: 'decoy', title: 'Rechner auf dem Beistelltisch', badge: [962, 218],
+      look: 'Auf dem Beistelltisch steht ein Rechner mit dem Aufkleber „GAST-PC · Gastnetz“. Er zeigt die DentaCloud-Website.',
+      explain: 'Richtig eingerichtet: Der Gast-PC hängt in einem eigenen Netz ohne Zugriff auf das Firmennetz. Besucher kommen ins Internet, aber nicht an Codewerks Systeme.' },
+
+    uhr: { room: 'buero', type: 'flavor', title: 'Wanduhr', look: 'Die Uhr zeigt 12:30 Uhr. In einer halben Stunde ist das Team zurück. Kein Befund.' },
+    pflanze: { room: 'buero', type: 'flavor', title: 'Zimmerpflanze', look: 'Die Pflanze lässt die Blätter hängen. Sie braucht dringend Wasser, aber keinen Schutzbedarf.' },
+    kaffee: { room: 'buero', type: 'flavor', title: 'Kaffeebecher', look: 'Lisas Becher mit geschweiften Klammern. Halb voll und längst kalt. Kein Befund.' },
+    rauchmelder: { room: 'server', type: 'flavor', title: 'Rauchmelder', look: 'Ein Rauchmelder, die grüne LED blinkt regelmäßig. Er funktioniert. Kein Befund.' },
+    beamer: { room: 'konferenz', type: 'flavor', title: 'Beamer', look: 'Der Beamer hängt an der Decke. Die Fernbedienung ist wie immer verschwunden. Kein Befund.' },
+    karaffe: { room: 'konferenz', type: 'flavor', title: 'Wasserkaraffe', look: 'Eine Karaffe und zwei Gläser vom letzten Kundentermin. Kein Befund.' }
+  };
+
+  var ORDER = ['postit', 'laptop', 'forcepush', 'sperre', 'pizza', 'tuer', 'nas', 'kartons', 'loescher', 'whiteboard', 'usb', 'gastpc'];
+  var PROBLEMS = ORDER.filter(function (id) { return ITEMS[id].type === 'problem'; });
+  var MAX = ORDER.reduce(function (s, id) {
+    var it = ITEMS[id];
+    return s + (it.type === 'problem' ? 10 + 3 * it.goals.length : 5);
+  }, 0);
+
+  var state = { judged: {}, score: 0, start: null, timerId: null, current: null, ended: false, lastFocus: null };
+
+  var $ = function (s) { return document.querySelector(s); };
+  var modal = $('#modal'), dlg = $('#dlg');
+
+  /* Rack-Einheiten zeichnen */
+  (function drawRack() {
+    var g = document.getElementById('rack-units');
+    var names = ['db-prod-01', 'db-prod-02', 'app-01', 'app-02', 'git-01', 'build-01', 'vpn-01', 'fw-01', 'core-switch'];
+    var ns = 'http://www.w3.org/2000/svg', html = '';
+    names.forEach(function (n, i) {
+      var y = 92 + i * 32;
+      html += '<rect x="442" y="' + y + '" width="156" height="26" rx="1" fill="#374151"/>' +
+        '<circle cx="452" cy="' + (y + 13) + '" r="2.5" fill="#22c55e"/>' +
+        '<circle cx="461" cy="' + (y + 13) + '" r="2.5" fill="' + (i % 3 === 1 ? '#f59e0b' : '#22c55e') + '"/>' +
+        '<line x1="472" y1="' + (y + 9) + '" x2="540" y2="' + (y + 9) + '" stroke="#4b5563" stroke-width="2"/>' +
+        '<line x1="472" y1="' + (y + 17) + '" x2="540" y2="' + (y + 17) + '" stroke="#4b5563" stroke-width="2"/>' +
+        '<text x="592" y="' + (y + 16) + '" text-anchor="end" font-size="7" fill="#9ca3af" font-family="ui-monospace, Menlo, Consolas, monospace">' + n + '</text>';
+    });
+    g.innerHTML = html;
+  })();
+
+  /* Räume */
+  function showRoom(room) {
+    document.querySelectorAll('.scene').forEach(function (s) {
+      if (s.id === 'room-' + room) s.removeAttribute('hidden'); else s.setAttribute('hidden', '');
+    });
+    document.querySelectorAll('nav.rooms button').forEach(function (b) {
+      b.setAttribute('aria-selected', b.dataset.room === room ? 'true' : 'false');
+    });
+  }
+  document.querySelectorAll('nav.rooms button').forEach(function (b) {
+    b.addEventListener('click', function () { showRoom(b.dataset.room); });
+  });
+
+  /* Klicks in den Szenen */
+  document.querySelectorAll('.scene').forEach(function (svg) {
+    svg.addEventListener('click', function (e) {
+      var hs = e.target.closest('.hs');
+      if (hs) { openItem(hs.dataset.id, hs); } else { toast(e); }
+    });
+  });
+  document.querySelectorAll('.hs').forEach(function (hs) {
+    hs.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openItem(hs.dataset.id, hs); }
+    });
+  });
+
+  var toastMsgs = ['Nichts Auffälliges.', 'Hier ist alles in Ordnung.', 'Kein Befund.'];
+  function toast(e) {
+    var stage = $('#stage'), r = stage.getBoundingClientRect();
+    var t = document.createElement('div');
+    t.className = 'toast';
+    t.textContent = toastMsgs[Math.floor(Math.random() * toastMsgs.length)];
+    t.style.left = (e.clientX - r.left) + 'px';
+    t.style.top = (e.clientY - r.top) + 'px';
+    stage.appendChild(t);
+    setTimeout(function () { t.remove(); }, 1300);
+  }
+
+  /* Dialog */
+  function openModal() {
+    modal.hidden = false;
+    var f = dlg.querySelector('button:not([disabled])');
+    if (f) f.focus();
+  }
+  function closeModal() {
+    modal.hidden = true;
+    state.current = null;
+    if (state.lastFocus && state.lastFocus.focus) state.lastFocus.focus();
+    if (!state.ended && Object.keys(state.judged).length === ORDER.length) showEnd();
+  }
+  modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !modal.hidden) closeModal(); });
+
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+  function openItem(id, el) {
+    if (state.ended) return;
+    var it = ITEMS[id];
+    state.current = id; state.lastFocus = el;
+    if (it.type === 'flavor') renderFlavor(it);
+    else if (state.judged[id]) renderFeedback(id);
+    else renderQuestion(id);
+    openModal();
+  }
+
+  function head(it) {
+    return '<p class="kicker">' + ROOMS[it.room] + '</p><h2 id="dlg-title">' + esc(it.title) + '</h2>';
+  }
+
+  function renderFlavor(it) {
+    dlg.innerHTML = head(it) + '<p class="look">' + esc(it.look) + '</p>' +
+      '<div class="actions"><button class="btn primary" data-act="close" type="button">Weiter suchen</button></div>';
+    bind();
+  }
+
+  function renderQuestion(id) {
+    var it = ITEMS[id];
+    dlg.innerHTML = head(it) + '<p class="look">' + esc(it.look) + '</p>' +
+      '<p class="q">Ist das ein Sicherheitsproblem?</p>' +
+      '<div class="actions"><button class="btn primary" data-act="yes" type="button">Ja, das ist ein Problem</button>' +
+      '<button class="btn" data-act="no" type="button">Nein, das ist in Ordnung</button></div>' +
+      '<button class="linkbtn" data-act="close" type="button">Später ansehen</button>';
+    bind();
+  }
+
+  function renderGoals(id) {
+    var it = ITEMS[id];
+    var chosen = {};
+    dlg.innerHTML = head(it) +
+      '<p class="q">Welche Schutzziele sind gefährdet? Mehrfachauswahl möglich.</p>' +
+      '<div class="goals">' + ['V', 'I', 'A'].map(function (g) {
+        return '<button class="goal" type="button" aria-pressed="false" data-goal="' + g + '"><b>' + g + '</b><span>' + GOALS[g] + '</span></button>';
+      }).join('') + '</div>' +
+      '<div class="actions"><button class="btn primary" data-act="check" type="button" disabled>Prüfen</button>' +
+      '<button class="btn" data-act="back" type="button">Zurück</button></div>';
+    dlg.querySelectorAll('.goal').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var g = b.dataset.goal;
+        chosen[g] = !chosen[g];
+        b.setAttribute('aria-pressed', chosen[g] ? 'true' : 'false');
+        dlg.querySelector('[data-act="check"]').disabled = !Object.keys(chosen).some(function (k) { return chosen[k]; });
+      });
+    });
+    bind(function (act) {
+      if (act === 'check') judge(id, true, Object.keys(chosen).filter(function (k) { return chosen[k]; }));
+      if (act === 'back') { renderQuestion(id); openModal(); }
+    });
+    var f = dlg.querySelector('.goal'); if (f) f.focus();
+  }
+
+  function bind(extra) {
+    dlg.querySelectorAll('[data-act]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var act = b.dataset.act, id = state.current;
+        if (act === 'close') return closeModal();
+        if (act === 'yes') return renderGoals(id);
+        if (act === 'no') return judge(id, false, []);
+        if (act === 'finish') { closeModal(); return showEnd(); }
+        if (act === 'end-confirm') { modal.hidden = true; return showEnd(); }
+        if (extra) extra(act);
+      });
+    });
+  }
+
+  function judge(id, saysProblem, goals) {
+    var it = ITEMS[id], pts = 0, verdict;
+    if (it.type === 'problem') {
+      if (saysProblem) {
+        verdict = 'found'; pts = 10;
+        goals.forEach(function (g) { pts += it.goals.indexOf(g) >= 0 ? 3 : -2; });
+      } else { verdict = 'missed'; }
+    } else {
+      if (saysProblem) { verdict = 'false'; pts = -5; } else { verdict = 'cleared'; pts = 5; }
+    }
+    state.judged[id] = { verdict: verdict, goals: goals, pts: pts };
+    state.score += pts;
+    updateStats();
+    addBadge(id);
+    renderFeedback(id);
+    var f = dlg.querySelector('button'); if (f) f.focus();
+  }
+
+  var VERDICTS = {
+    found: ['good', 'Gut erkannt – das ist ein Problem!'],
+    missed: ['bad', 'Übersehen! Hier liegt ein Problem.'],
+    cleared: ['good', 'Richtig – das ist in Ordnung.'],
+    false: ['bad', 'Fehlalarm – das ist kein Problem.']
+  };
+
+  function renderFeedback(id) {
+    var it = ITEMS[id], j = state.judged[id], v = VERDICTS[j.verdict];
+    var pts = (j.pts > 0 ? '+' : '') + j.pts + ' Punkte';
+    var chips = '';
+    if (it.type === 'problem') {
+      if (j.verdict === 'found') {
+        chips = ['V', 'I', 'A'].map(function (g) {
+          var c = j.goals.indexOf(g) >= 0, ok = it.goals.indexOf(g) >= 0;
+          if (c && ok) return '<span class="chip ok">✓ ' + GOALS[g] + '</span>';
+          if (c && !ok) return '<span class="chip wrong">✗ ' + GOALS[g] + ' – nicht betroffen</span>';
+          if (!c && ok) return '<span class="chip miss">+ ' + GOALS[g] + ' – auch betroffen</span>';
+          return '';
+        }).join('');
+      } else {
+        chips = it.goals.map(function (g) { return '<span class="chip neutral">Gefährdet: ' + GOALS[g] + '</span>'; }).join('');
+      }
+      chips = '<div class="chips">' + chips + '</div>';
+    }
+    var done = Object.keys(state.judged).length === ORDER.length;
+    dlg.innerHTML = head(it) +
+      '<div class="verdict ' + v[0] + '"><span>' + v[1] + '</span><small>' + pts + '</small></div>' +
+      chips +
+      '<p>' + esc(it.explain) + '</p>' +
+      (it.measure ? '<p class="measure"><b>Was hilft?</b> ' + esc(it.measure) + '</p>' : '') +
+      '<div class="actions">' + (done
+        ? '<button class="btn primary" data-act="finish" type="button">Zur Auswertung</button>'
+        : '<button class="btn primary" data-act="close" type="button">Weiter suchen</button>') + '</div>';
+    bind();
+  }
+
+  function addBadge(id) {
+    var it = ITEMS[id], j = state.judged[id];
+    var good = j.verdict === 'found' || j.verdict === 'cleared';
+    var svg = document.getElementById('room-' + it.room);
+    var g = svg.querySelector('.badges');
+    var x = it.badge[0], y = it.badge[1];
+    g.insertAdjacentHTML('beforeend',
+      '<g class="badge"><circle cx="' + x + '" cy="' + y + '" r="12" fill="' + (good ? '#16a34a' : '#dc2626') + '" stroke="#fff" stroke-width="2.5"/>' +
+      '<text x="' + x + '" y="' + (y + 5) + '" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">' + (good ? '✓' : '✗') + '</text></g>');
+  }
+
+  function foundCount() {
+    return PROBLEMS.filter(function (id) { return state.judged[id] && state.judged[id].verdict === 'found'; }).length;
+  }
+  function updateStats() {
+    $('#st-found').textContent = foundCount();
+    $('#st-score').textContent = Math.max(0, state.score);
+  }
+  function fmt(sec) {
+    var m = Math.floor(sec / 60), s = sec % 60;
+    return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+  }
+  function elapsed() { return state.start ? Math.floor((Date.now() - state.start) / 1000) : 0; }
+
+  /* Start */
+  $('#btn-start').addEventListener('click', function () {
+    $('#intro').hidden = true;
+    state.start = Date.now();
+    state.timerId = setInterval(function () { $('#st-time').textContent = fmt(elapsed()); }, 1000);
+    var first = document.querySelector('nav.rooms button'); if (first) first.focus();
+  });
+
+  /* Beenden */
+  $('#btn-end').addEventListener('click', function () {
+    if (state.ended) return;
+    var open = ORDER.length - Object.keys(state.judged).length;
+    state.current = null; state.lastFocus = $('#btn-end');
+    dlg.innerHTML = '<h2 id="dlg-title">Rundgang beenden?</h2>' +
+      (open > 0 ? '<p>Sie haben noch nicht alles untersucht. Nicht untersuchte Probleme zählen als nicht gefunden.</p>' : '<p>Sie haben alles untersucht.</p>') +
+      '<div class="actions"><button class="btn primary" data-act="end-confirm" type="button">Ja, zur Auswertung</button>' +
+      '<button class="btn" data-act="close" type="button">Weiter suchen</button></div>';
+    bind();
+    openModal();
+  });
+
+  function showEnd() {
+    if (state.ended) return;
+    state.ended = true;
+    clearInterval(state.timerId);
+    var t = elapsed();
+    var found = foundCount();
+    var decoys = ORDER.filter(function (id) { return ITEMS[id].type === 'decoy'; });
+    var cleared = decoys.filter(function (id) { return state.judged[id] && state.judged[id].verdict === 'cleared'; }).length;
+    var falseAlarms = decoys.filter(function (id) { return state.judged[id] && state.judged[id].verdict === 'false'; }).length;
+    var score = Math.max(0, state.score);
+    var pct = score / MAX;
+    var rating = pct >= 0.85 ? 'Auditreif! Sandra Kühn ist beeindruckt.'
+      : pct >= 0.6 ? 'Solide Arbeit, aber ein paar Dinge sind Ihnen durchgerutscht.'
+      : 'Da geht noch was. Schauen Sie sich die Lösungen genau an.';
+
+    var rows = ORDER.map(function (id) {
+      var it = ITEMS[id], j = state.judged[id], status, cls;
+      if (!j) { status = 'nicht untersucht'; cls = 'st-none'; }
+      else if (j.verdict === 'found') { status = 'gefunden' + (j.goals.length ? ' (' + j.goals.join(', ') + ')' : ''); cls = 'st-good'; }
+      else if (j.verdict === 'missed') { status = 'übersehen'; cls = 'st-bad'; }
+      else if (j.verdict === 'cleared') { status = 'richtig erkannt'; cls = 'st-good'; }
+      else { status = 'Fehlalarm'; cls = 'st-bad'; }
+      var sol = it.type === 'problem' ? 'Problem: ' + it.goals.join(', ') : 'in Ordnung';
+      return '<tr><td>' + ROOMS[it.room] + '</td><td>' + esc(it.title) + '</td><td class="' + cls + '">' + status + '</td><td>' + sol +
+        '</td><td>' + esc(it.measure || it.explain) + '</td></tr>';
+    }).join('');
+
+    $('#end-card').innerHTML =
+      '<p class="kicker">Auswertung</p><h2>Rundgang beendet</h2>' +
+      '<p class="time">Benötigte Zeit: ' + fmt(t) + ' Minuten</p>' +
+      '<div class="summary">' +
+        '<div class="sumbox"><b>' + found + ' / 8</b><span>Probleme gefunden</span></div>' +
+        '<div class="sumbox"><b>' + cleared + ' / 4</b><span>falsche Fährten durchschaut</span></div>' +
+        '<div class="sumbox"><b>' + falseAlarms + '</b><span>Fehlalarme</span></div>' +
+        '<div class="sumbox"><b>' + score + ' / ' + MAX + '</b><span>Punkte</span></div>' +
+      '</div>' +
+      '<p class="rating">' + rating + '</p>' +
+      '<div class="tablewrap"><table class="result"><thead><tr><th>Raum</th><th>Objekt</th><th>Ihr Urteil</th><th>Lösung</th><th>Was hilft? / Warum?</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      '<p class="hint">V = Vertraulichkeit · I = Integrität · A = Verfügbarkeit</p>' +
+      '<div class="actions noprint"><button class="btn primary" id="btn-print" type="button">Drucken oder als PDF speichern</button>' +
+      '<button class="btn" id="btn-restart" type="button">Neu starten</button></div>';
+    $('#end').hidden = false;
+    $('#btn-print').addEventListener('click', function () { window.print(); });
+    $('#btn-restart').addEventListener('click', function () { location.reload(); });
+    $('#btn-print').focus();
+  }
+})();
+</script>
+</body>
+</html>
