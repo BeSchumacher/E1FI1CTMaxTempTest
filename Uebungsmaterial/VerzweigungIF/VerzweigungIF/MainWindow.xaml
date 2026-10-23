@@ -1,0 +1,23 @@
+﻿<Window x:Class="VerzweigungIF.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:VerzweigungIF"
+        mc:Ignorable="d"
+        Title="MainWindow" Height="450" Width="800">
+    <Grid>
+        <Button x:Name="btnGo" Content="IF-Verzweigung ausprobieren" HorizontalAlignment="Left" Margin="10,164,0,0" VerticalAlignment="Top" Width="184" Height="65" Click="btnGo_Click"/>
+        <Button x:Name="btnGo2" Content="IF-Verzweigung Operatoren" HorizontalAlignment="Left" Margin="207,164,0,0" VerticalAlignment="Top" Width="184" Height="65" Click="btnGo2_Click" />
+        <Button x:Name="btnElse" Content="IF-ELSE" HorizontalAlignment="Left" Margin="405,164,0,0" VerticalAlignment="Top" Width="184" Height="65" Click="btnElse_Click" />
+        <Button x:Name="btnElseIfElse" Content="IF-ELSE-Verschachtelung" HorizontalAlignment="Left" Margin="600,164,0,0" VerticalAlignment="Top" Width="184" Height="65" Click="btnElseIfElse_Click"  />
+
+        <Label x:Name="lblA" Content="A:" HorizontalAlignment="Left" Margin="189,17,0,0" VerticalAlignment="Top" Height="35" Width="49"/>
+        <Label x:Name="lblB" Content="B:" HorizontalAlignment="Left" Margin="398,17,0,0" VerticalAlignment="Top" Height="28" Width="33"/>
+
+        <Label x:Name="lblAusgabe" Content="Ausgabe..." HorizontalAlignment="Left" Margin="189,265,0,0" VerticalAlignment="Top" Height="47" Width="375"/>
+        <TextBox x:Name="txtEingabeA" Text="EingabeA" HorizontalAlignment="Left" Height="73" Margin="189,45,0,0" TextWrapping="Wrap"  VerticalAlignment="Top" Width="184"/>
+        <TextBox x:Name="txtEingabeB" Text="EingabeB" HorizontalAlignment="Left" Height="73" Margin="398,45,0,0" TextWrapping="Wrap"  VerticalAlignment="Top" Width="184"/>
+
+    </Grid>
+</Window>
